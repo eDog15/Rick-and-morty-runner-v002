@@ -1,17 +1,32 @@
 using UnityEngine;
 
-// This script handles the player's shooting mechanics and can be upgraded.
 public class PlayerShooting : MonoBehaviour
 {
-    [Header("Setup")]
+    // Enum to define the available weapon types
+    public enum WeaponType
+    {
+        Pistol,
+        Shotgun,
+        GrenadeLauncher
+    }
+
+    [Header("Weapon Settings")]
+    public WeaponType currentWeapon = WeaponType.Pistol;
+
+    [Header("Prefabs")]
     public GameObject projectilePrefab;
+    public GameObject grenadePrefab; // Prefab for the grenade
+
+    [Header("General Setup")]
     public Transform firePoint;
 
-    [Header("Shooting Stats")]
+    [Header("General Stats")]
     public float fireRate = 2f;
-    public int numberOfProjectiles = 1;
-    public float spreadAngle = 10f;
     public int projectileDamage = 1;
+
+    [Header("Shotgun-Specific Stats")]
+    public int shotgunProjectileCount = 3;
+    public float shotgunSpreadAngle = 15f;
 
     private float nextFireTime = 0f;
 
@@ -26,35 +41,68 @@ public class PlayerShooting : MonoBehaviour
 
     void Shoot()
     {
-        if (projectilePrefab == null || firePoint == null)
+        switch (currentWeapon)
         {
-            Debug.LogWarning("Projectile prefab or fire point not assigned.");
-            return;
+            case WeaponType.Pistol:
+                ShootPistol();
+                break;
+            case WeaponType.Shotgun:
+                ShootShotgun();
+                break;
+            case WeaponType.GrenadeLauncher:
+                ShootGrenadeLauncher();
+                break;
         }
+    }
 
-        float angleStep = spreadAngle / (numberOfProjectiles > 1 ? (float)(numberOfProjectiles - 1) : 1f);
-        float startingAngle = -spreadAngle / 2f;
+    void ShootPistol()
+    {
+        if (projectilePrefab == null || firePoint == null) return;
 
-        for (int i = 0; i < numberOfProjectiles; i++)
+        GameObject projGO = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation);
+        Projectile projectile = projGO.GetComponent<Projectile>();
+        if (projectile != null)
+        {
+            projectile.damage = projectileDamage;
+        }
+    }
+
+    void ShootShotgun()
+    {
+        if (projectilePrefab == null || firePoint == null) return;
+
+        float angleStep = shotgunSpreadAngle / (shotgunProjectileCount > 1 ? (float)(shotgunProjectileCount - 1) : 1f);
+        float startingAngle = -shotgunSpreadAngle / 2f;
+
+        for (int i = 0; i < shotgunProjectileCount; i++)
         {
             float currentAngle = startingAngle + i * angleStep;
-            if (numberOfProjectiles == 1)
-            {
-                currentAngle = 0; // Ensure single projectile fires straight.
-            }
-
             Quaternion rotation = firePoint.rotation * Quaternion.Euler(0, currentAngle, 0);
 
-            // Instantiate the projectile
-            GameObject projectileGO = Instantiate(projectilePrefab, firePoint.position, rotation);
-
-            // Set the damage for the projectile
-            Projectile projectile = projectileGO.GetComponent<Projectile>();
+            GameObject projGO = Instantiate(projectilePrefab, firePoint.position, rotation);
+            Projectile projectile = projGO.GetComponent<Projectile>();
             if (projectile != null)
             {
                 projectile.damage = projectileDamage;
             }
         }
+    }
+
+    void ShootGrenadeLauncher()
+    {
+        if (grenadePrefab == null || firePoint == null) return;
+
+        // The logic for the grenade will be mostly in the grenade's own script.
+        // We might want to give it an initial velocity boost here.
+        Instantiate(grenadePrefab, firePoint.position, firePoint.rotation);
+    }
+
+    // --- PUBLIC WEAPON MANAGEMENT ---
+
+    public void SwitchWeapon(WeaponType newWeapon)
+    {
+        currentWeapon = newWeapon;
+        Debug.Log("Switched to weapon: " + newWeapon.ToString());
     }
 
     // --- PUBLIC UPGRADE METHODS ---
@@ -65,14 +113,9 @@ public class PlayerShooting : MonoBehaviour
         Debug.Log("Fire Rate upgraded to: " + fireRate);
     }
 
-    public void IncreaseProjectiles(int amount)
-    {
-        numberOfProjectiles += amount;
-        Debug.Log("Number of projectiles upgraded to: " + numberOfProjectiles);
-    }
-
     public void UpgradeDamage(int amount)
     {
+        // This will upgrade the damage for Pistol and Shotgun
         projectileDamage += amount;
         Debug.Log("Projectile Damage upgraded to: " + projectileDamage);
     }

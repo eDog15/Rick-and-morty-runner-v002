@@ -1,52 +1,72 @@
 using UnityEngine;
 
-// This script defines a portal that upgrades the player upon entry.
+// This script defines a portal that applies a specific effect to the player.
 public class Portal : MonoBehaviour
 {
-    public enum UpgradeType
+    // A single, comprehensive enum for all possible portal effects.
+    public enum PortalType
     {
-        FireRate,
-        MultiShot,
-        Damage
+        SwitchWeapon,
+        IncreaseDamage,
+        DecreaseDamage,
+        IncreaseFireRate,
+        DecreaseFireRate
     }
 
-    [Header("Upgrade Settings")]
-    public UpgradeType upgradeType;
+    [Header("Portal Configuration")]
+    public PortalType portalType;
 
-    [Header("Values")]
-    public float fireRateIncrease = 0.5f;
-    public int additionalProjectiles = 1;
-    public int damageIncrease = 1;
+    [Header("Effect Values")]
+    [Tooltip("The amount to change damage by. Always use a positive number.")]
+    public int damageAmount = 1;
+
+    [Tooltip("The amount to change fire rate by. Always use a positive number.")]
+    public float fireRateAmount = 0.5f;
+
+    [Tooltip("The weapon to switch to if the portal type is SwitchWeapon.")]
+    public PlayerShooting.WeaponType weaponToSwitchTo = PlayerShooting.WeaponType.Shotgun;
+
 
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Player"))
         {
             PlayerShooting playerShooting = other.GetComponent<PlayerShooting>();
-
             if (playerShooting != null)
             {
-                ApplyUpgrade(playerShooting);
+                ApplyEffect(playerShooting);
                 Destroy(gameObject);
             }
         }
     }
 
-    private void ApplyUpgrade(PlayerShooting player)
+    private void ApplyEffect(PlayerShooting player)
     {
-        switch (upgradeType)
+        switch (portalType)
         {
-            case UpgradeType.FireRate:
-                player.UpgradeFireRate(fireRateIncrease);
-                Debug.Log("Player picked up a Fire Rate upgrade.");
+            case PortalType.SwitchWeapon:
+                player.SwitchWeapon(weaponToSwitchTo);
                 break;
-            case UpgradeType.MultiShot:
-                player.IncreaseProjectiles(additionalProjectiles);
-                Debug.Log("Player picked up a Multi-Shot upgrade.");
+
+            case PortalType.IncreaseDamage:
+                player.UpgradeDamage(Mathf.Abs(damageAmount));
+                Debug.Log("Player damage increased.");
                 break;
-            case UpgradeType.Damage:
-                player.UpgradeDamage(damageIncrease);
-                Debug.Log("Player picked up a Damage upgrade.");
+
+            case PortalType.DecreaseDamage:
+                // We use -Mathf.Abs to ensure it's always a decrease, even if a negative number is entered.
+                player.UpgradeDamage(-Mathf.Abs(damageAmount));
+                Debug.Log("Player damage decreased.");
+                break;
+
+            case PortalType.IncreaseFireRate:
+                player.UpgradeFireRate(Mathf.Abs(fireRateAmount));
+                Debug.Log("Player fire rate increased.");
+                break;
+
+            case PortalType.DecreaseFireRate:
+                player.UpgradeFireRate(-Mathf.Abs(fireRateAmount));
+                Debug.Log("Player fire rate decreased.");
                 break;
         }
     }
