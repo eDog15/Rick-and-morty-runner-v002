@@ -1,30 +1,28 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-// This script manages the overall game flow, including waves and player progression.
+// This script acts as a "director" for the game, managing the flow of events.
 public class GameManager : MonoBehaviour
 {
-    // Singleton pattern to ensure only one instance of the GameManager exists
     public static GameManager Instance { get; private set; }
 
+    [Header("Core Components")]
     public EnemySpawner enemySpawner;
-    public Wave[] waves;
 
-    private int currentWaveIndex = 0;
+    [Header("Portal Settings")]
+    [Tooltip("A list of all possible portal prefabs the GameManager can spawn.")]
+    public List<GameObject> portalPrefabs;
+    [Tooltip("The location where portals will be spawned.")]
+    public Transform portalSpawnPoint;
 
-    // A simple class to define the properties of an enemy wave
-    [System.Serializable]
-    public class Wave
-    {
-        public string name;
-        public int numberOfEnemies;
-        public float spawnRate;
-        public float timeBetweenWaves = 5f;
-    }
+    [Header("Game Flow")]
+    [Tooltip("Time in seconds to wait between clearing a pattern and starting the next one.")]
+    public float timeBetweenPatterns = 5f;
+
 
     private void Awake()
     {
-        // Implement the Singleton pattern
         if (Instance == null)
         {
             Instance = this;
@@ -47,26 +45,49 @@ public class GameManager : MonoBehaviour
 
     IEnumerator GameLoop()
     {
-        // Loop through all the waves defined in the inspector
-        foreach (Wave wave in waves)
+        // This is the main game loop that runs indefinitely.
+        while (true)
         {
-            Debug.Log("Starting " + wave.name);
-            enemySpawner.StartWave(wave.numberOfEnemies, wave.spawnRate);
+            // --- Step 1: Execute a random enemy spawn pattern ---
+            int patternCount = enemySpawner.spawnPatterns.Count;
+            if (patternCount == 0)
+            {
+                Debug.LogWarning("No spawn patterns defined in the EnemySpawner. Game loop will pause.");
+                yield return new WaitUntil(() => enemySpawner.spawnPatterns.Count > 0); // Wait until patterns are added
+            }
 
-            // Wait until all enemies in the current wave are defeated
+            int randomPatternIndex = Random.Range(0, patternCount);
+            enemySpawner.ExecutePattern(randomPatternIndex);
+
+            // --- Step 2: Wait for the pattern to be cleared ---
+            // We wait until the pattern is fully spawned AND all enemies are defeated.
+            // A simple way is to just wait for enemy count to be zero after a brief delay.
+            yield return new WaitForSeconds(1f); // Small initial delay
             yield return new WaitUntil(() => Enemy.enemyCount == 0);
+            Debug.Log("Pattern cleared!");
 
-            Debug.Log(wave.name + " completed!");
+            // --- Step 3: Spawn a reward portal ---
+            SpawnPortal();
 
-            // --- Placeholder for spawning a portal ---
-            // Here you could instantiate a portal prefab to give the player an upgrade.
-            // Example: Instantiate(portalPrefab, portalSpawnPoint.position, Quaternion.identity);
+            // --- Step 4: Wait before starting the next pattern ---
+            yield return new WaitForSeconds(timeBetweenPatterns);
+        }
+    }
 
-            // Wait for a specified time before starting the next wave
-            yield return new WaitForSeconds(wave.timeBetweenWaves);
+    void SpawnPortal()
+    {
+        if (portalPrefabs == null || portalPrefabs.Count == 0 || portalSpawnPoint == null)
+        {
+            Debug.LogWarning("Portal prefabs or spawn point not set up in GameManager. Skipping portal spawn.");
+            return;
         }
 
-        Debug.Log("All waves completed! Game Over!");
-        // Here you could trigger a game over screen or a victory condition
+        // Pick a random portal from the list
+        int randomPortalIndex = Random.Range(0, portalPrefabs.Count);
+        GameObject portalPrefab = portalPrefabs[randomPortalIndex];
+
+        // Spawn the chosen portal
+        Instantiate(portalPrefab, portalSpawnPoint.position, portalSpawnPoint.rotation);
+        Debug.Log("Spawning portal: " + portalPrefab.name);
     }
 }
