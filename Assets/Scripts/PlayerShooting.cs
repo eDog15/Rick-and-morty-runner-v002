@@ -23,6 +23,7 @@ public class PlayerShooting : MonoBehaviour
     [Header("General Stats")]
     public float fireRate = 2f;
     public int projectileDamage = 1;
+    public bool isAutoFire = true; // Toggle for automatic shooting
 
     [Header("Shotgun-Specific Stats")]
     public int shotgunProjectileCount = 3;
@@ -32,7 +33,8 @@ public class PlayerShooting : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetButton("Fire1") && Time.time >= nextFireTime)
+        // If auto-fire is on, shoot whenever the cooldown is ready.
+        if (isAutoFire && Time.time >= nextFireTime)
         {
             nextFireTime = Time.time + 1f / fireRate;
             Shoot();
@@ -92,8 +94,6 @@ public class PlayerShooting : MonoBehaviour
     {
         if (grenadePrefab == null || firePoint == null) return;
 
-        // The logic for the grenade will be mostly in the grenade's own script.
-        // We might want to give it an initial velocity boost here.
         Instantiate(grenadePrefab, firePoint.position, firePoint.rotation);
     }
 
@@ -115,7 +115,6 @@ public class PlayerShooting : MonoBehaviour
 
     public void UpgradeDamage(int amount)
     {
-        // This will upgrade the damage for Pistol and Shotgun
         projectileDamage += amount;
         Debug.Log("Projectile Damage upgraded to: " + projectileDamage);
     }

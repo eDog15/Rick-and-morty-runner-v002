@@ -1,38 +1,47 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// This script procedurally generates an endless corridor.
-// To use this script:
-// 1. Create a prefab that represents one segment of your corridor (floor and walls).
-// 2. Create an empty GameObject in your scene and attach this script to it.
-// 3. Assign your player object to the 'player' field.
-// 4. Assign your corridor segment prefab to the 'trackSegmentPrefab' field.
-// 5. Adjust the number of visible segments to control how far the track generates.
-
+// This script generates an endless, moving corridor by recycling track segments.
 public class TrackGenerator : MonoBehaviour
 {
-    public Transform player;
-    public GameObject trackSegmentPrefab;
-    public int visibleSegments = 5; // Number of segments to keep active at a time
+    public static TrackGenerator Instance { get; private set; }
 
-    private float segmentLength = 0f;
-    private float spawnZ = 0f;
-    private List<GameObject> activeSegments = new List<GameObject>();
+    [Header("World Settings")]
+    public float worldSpeed = 10f;
+
+    [Header("Track Segments")]
+    public GameObject trackSegmentPrefab;
+    public int initialSegments = 5;
+
+    private Queue<GameObject> activeSegments = new Queue<GameObject>();
+    private float segmentLength;
+    private float nextSpawnZ;
+
+    private void Awake()
+    {
+        // Singleton pattern
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
 
     void Start()
     {
-        if (player == null || trackSegmentPrefab == null)
+        if (trackSegmentPrefab == null)
         {
-            Debug.LogError("Player or Track Segment Prefab not assigned in TrackGenerator.");
+            Debug.LogError("Track Segment Prefab is not assigned!");
             return;
         }
 
-        // It's crucial that the prefab has a defined size. We get it from the MeshRenderer bounds.
-        // Ensure your prefab has a MeshRenderer or this will fail.
         segmentLength = trackSegmentPrefab.GetComponentInChildren<Renderer>().bounds.size.z;
+        nextSpawnZ = 0;
 
-        // Spawn initial segments
-        for (int i = 0; i < visibleSegments; i++)
+        for (int i = 0; i < initialSegments; i++)
         {
             SpawnSegment();
         }
@@ -40,25 +49,29 @@ public class TrackGenerator : MonoBehaviour
 
     void Update()
     {
-        // Check if the player has moved past the second segment
-        if (player.position.z - segmentLength > spawnZ - (visibleSegments * segmentLength))
+        foreach (GameObject segment in activeSegments)
         {
-            SpawnSegment();
-            DeleteOldestSegment();
+            segment.transform.position += Vector3.back * worldSpeed * Time.deltaTime;
+        }
+
+        if (activeSegments.Peek().transform.position.z <= -segmentLength)
+        {
+            RecycleOldestSegment();
         }
     }
 
-    private void SpawnSegment()
+    void SpawnSegment()
     {
-        GameObject newSegment = Instantiate(trackSegmentPrefab, new Vector3(0, 0, spawnZ), Quaternion.identity);
-        newSegment.transform.SetParent(transform);
-        activeSegments.Add(newSegment);
-        spawnZ += segmentLength;
+        GameObject newSegment = Instantiate(trackSegmentPrefab, transform);
+        newSegment.transform.position = new Vector3(0, 0, nextSpawnZ);
+        nextSpawnZ += segmentLength;
+        activeSegments.Enqueue(newSegment);
     }
 
-    private void DeleteOldestSegment()
+    void RecycleOldestSegment()
     {
-        Destroy(activeSegments[0]);
-        activeSegments.RemoveAt(0);
+        GameObject oldestSegment = activeSegments.Dequeue();
+        oldestSegment.transform.position = new Vector3(0, 0, nextSpawnZ - segmentLength);
+        activeSegments.Enqueue(oldestSegment);
     }
 }

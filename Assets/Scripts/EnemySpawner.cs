@@ -10,9 +10,6 @@ public class SpawnEvent
     [Tooltip("The type of enemy to spawn. For now, we only have one.")]
     public GameObject enemyPrefab;
 
-    [Tooltip("Index of the spawn point in the EnemySpawner's list.")]
-    public int spawnPointIndex;
-
     [Tooltip("Delay in seconds before this enemy spawns (after the previous event).")]
     public float delay;
 }
@@ -25,12 +22,14 @@ public class SpawnPattern
 }
 
 
-// This script executes pre-defined spawn patterns.
+// This script executes pre-defined spawn patterns within a dynamic area.
 public class EnemySpawner : MonoBehaviour
 {
-    [Header("Setup")]
-    [Tooltip("A list of all possible locations where enemies can spawn.")]
-    public List<Transform> spawnPoints;
+    [Header("Spawn Area")]
+    [Tooltip("The center of the spawn area, relative to this object.")]
+    public Vector3 areaCenter = new Vector3(0, 0, 30);
+    [Tooltip("The size (width and height) of the spawn area.")]
+    public Vector2 areaSize = new Vector2(5, 3);
 
     [Header("Patterns")]
     [Tooltip("A list of all spawn patterns this spawner can execute.")]
@@ -54,30 +53,32 @@ public class EnemySpawner : MonoBehaviour
         Debug.Log("Executing spawn pattern: " + pattern.patternName);
         foreach (SpawnEvent spawnEvent in pattern.spawnEvents)
         {
-            // Wait for the specified delay
             yield return new WaitForSeconds(spawnEvent.delay);
 
-            // Check if the spawn point index is valid
-            if (spawnEvent.spawnPointIndex >= spawnPoints.Count)
-            {
-                Debug.LogWarning("Invalid spawn point index in pattern: " + pattern.patternName);
-                continue; // Skip this event if the spawn point is invalid
-            }
-
-            // Get the prefab and spawn point
             GameObject prefabToSpawn = spawnEvent.enemyPrefab;
-            Transform spawnPoint = spawnPoints[spawnEvent.spawnPointIndex];
+            if (prefabToSpawn == null)
+            {
+                Debug.LogWarning("Enemy prefab is null for an event in pattern: " + pattern.patternName);
+                continue;
+            }
 
-            if (prefabToSpawn != null && spawnPoint != null)
-            {
-                // Spawn the enemy
-                Instantiate(prefabToSpawn, spawnPoint.position, spawnPoint.rotation);
-            }
-            else
-            {
-                Debug.LogWarning("Enemy prefab or spawn point is null for an event in pattern: " + pattern.patternName);
-            }
+            // Calculate a random position within the spawn area
+            float randomX = Random.Range(-areaSize.x / 2, areaSize.x / 2);
+            float randomY = Random.Range(-areaSize.y / 2, areaSize.y / 2);
+            Vector3 spawnPos = transform.position + areaCenter + new Vector3(randomX, randomY, 0);
+
+            // Spawn the enemy at the calculated random position
+            Instantiate(prefabToSpawn, spawnPos, Quaternion.identity);
         }
         Debug.Log("Finished spawn pattern: " + pattern.patternName);
+    }
+
+    // Draw a gizmo in the editor to visualize the spawn area
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = new Color(0, 1, 0, 0.5f); // Green, semi-transparent
+        Vector3 gizmoCenter = transform.position + areaCenter;
+        Vector3 gizmoSize = new Vector3(areaSize.x, areaSize.y, 0.1f);
+        Gizmos.DrawCube(gizmoCenter, gizmoSize);
     }
 }
