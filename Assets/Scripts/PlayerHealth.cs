@@ -20,7 +20,6 @@ public class PlayerHealth : MonoBehaviour
     void Start()
     {
         currentHealth = maxHealth;
-        // Here you would typically update the UI with the starting health
     }
 
     public void TakeDamage(int damageAmount)
@@ -29,8 +28,6 @@ public class PlayerHealth : MonoBehaviour
 
         currentHealth -= damageAmount;
         Debug.Log("Player took damage! Current health: " + currentHealth);
-
-        // Here you would update the UI
 
         if (currentHealth <= 0)
         {
@@ -41,36 +38,33 @@ public class PlayerHealth : MonoBehaviour
 
     private void Die()
     {
+        if (isDead) return;
         isDead = true;
-        Debug.Log("Game Over!");
 
-        // Disable player components to stop movement and shooting
-        // This is a simple way to end the run.
-        GetComponent<PlayerLaneMovement>().enabled = false;
-        GetComponent<PlayerShooting>().enabled = false;
+        // The GameManager is now responsible for handling the Game Over sequence
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.HandleGameOver();
+        }
 
-        // Here you would typically trigger a Game Over screen
+        // We can also disable the player object entirely
+        gameObject.SetActive(false);
     }
 
     private void OnCollisionEnter(Collision collision)
     {
         if (isDead) return;
 
-        // Check for collision with an Enemy
         if (collision.gameObject.GetComponent<Enemy>() != null)
         {
             TakeDamage(1);
-            // Destroy the enemy on collision to prevent multiple damage triggers
             Destroy(collision.gameObject);
-            return; // Exit after handling collision
+            return;
         }
 
-        // Check for collision with an Obstacle
         if (collision.gameObject.GetComponent<Obstacle>() != null)
         {
             TakeDamage(1);
-            // Optionally destroy the obstacle as well, or just let the player phase through
-            // For now, we assume obstacles are solid and stay
         }
     }
 }

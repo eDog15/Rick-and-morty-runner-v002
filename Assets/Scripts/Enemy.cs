@@ -29,20 +29,28 @@ public class Enemy : MonoBehaviour
     {
         enemyCount--;
         Debug.Log("Enemy defeated! Enemies remaining: " + enemyCount);
+
+        // Notify the GameManager to add score for the kill
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.AddKillScore();
+        }
+
         Destroy(gameObject);
     }
 
     private void OnCollisionEnter(Collision collision)
     {
-        // Check if the collider belongs to a projectile
+        // Check if the collider belongs to a projectile that is not an enemy projectile
         Projectile projectile = collision.gameObject.GetComponent<Projectile>();
         if (projectile != null)
         {
-            // Apply damage from the projectile
-            TakeDamage(projectile.damage);
-
-            // Destroy the projectile on impact
-            Destroy(collision.gameObject);
+            // This check will be needed once we have shooting enemies
+            // if (!projectile.isEnemyProjectile)
+            // {
+                TakeDamage(projectile.damage);
+                Destroy(collision.gameObject);
+            // }
         }
     }
 }

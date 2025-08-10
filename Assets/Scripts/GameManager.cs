@@ -1,8 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
+using UnityEngine.SceneManagement;
 
-// This script acts as a "director" for the game, managing the flow of events.
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
@@ -11,26 +12,34 @@ public class GameManager : MonoBehaviour
     public EnemySpawner enemySpawner;
 
     [Header("Portal Settings")]
-    [Tooltip("A list of all possible portal prefabs the GameManager can spawn.")]
     public List<GameObject> portalPrefabs;
-    [Tooltip("The location where portals will be spawned.")]
     public Transform portalSpawnPoint;
 
     [Header("Game Flow")]
-    [Tooltip("Time in seconds to wait between clearing a pattern and starting the next one.")]
     public float timeBetweenPatterns = 5f;
+    private bool isGameOver = false;
 
+    [Header("Scoring & Currency")]
+    public int scorePerKill = 100;
+    public int scorePerSecond = 10;
+    [Tooltip("How many score points are worth 1 gold coin.")]
+    public int scoreToGoldConversionRate = 1000;
+
+    [Header("UI")]
+    public TextMeshProUGUI scoreText;
+    public GameObject gameOverScreen;
+    public TextMeshProUGUI finalScoreText;
+    public TextMeshProUGUI goldEarnedText; // Text to show gold earned this run
+
+    private int currentKillScore;
+    private float sessionTimer;
+    private const string GoldPlayerPrefsKey = "PlayerTotalGold";
 
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
+        Time.timeScale = 1f;
     }
 
     void Start()
@@ -40,36 +49,92 @@ public class GameManager : MonoBehaviour
             Debug.LogError("Enemy Spawner not assigned in the GameManager.");
             return;
         }
-        StartCoroutine(GameLoop());
+
+        if(gameOverScreen != null) gameOverScreen.SetActive(false);
+
+        currentKillScore = 0;
+        sessionTimer = 0f;
+        UpdateScoreUI();
+    }
+
+    void Update()
+    {
+        if (isGameOver) return;
+        sessionTimer += Time.deltaTime;
+        UpdateScoreUI();
+    }
+
+    public void AddKillScore()
+    {
+        if (isGameOver) return;
+        currentKillScore += scorePerKill;
+    }
+
+    private int GetCurrentTotalScore()
+    {
+        int timeScore = (int)(sessionTimer * scorePerSecond);
+        return currentKillScore + timeScore;
+    }
+
+    private void UpdateScoreUI()
+    {
+        if (scoreText != null)
+        {
+            scoreText.text = "Score: " + GetCurrentTotalScore().ToString();
+        }
+    }
+
+    public void HandleGameOver()
+    {
+        if (isGameOver) return;
+        isGameOver = true;
+        Time.timeScale = 0f;
+
+        int finalScore = GetCurrentTotalScore();
+        Debug.Log("Game Over! Final Score: " + finalScore);
+
+        // --- Currency Conversion & Saving ---
+        int goldEarned = finalScore / scoreToGoldConversionRate;
+        int totalGold = PlayerPrefs.GetInt(GoldPlayerPrefsKey, 0);
+        totalGold += goldEarned;
+        PlayerPrefs.SetInt(GoldPlayerPrefsKey, totalGold);
+        PlayerPrefs.Save(); // Ensure data is written to disk
+        Debug.Log("Earned " + goldEarned + " gold. Total gold: " + totalGold);
+
+        // --- Show Game Over Screen ---
+        if (gameOverScreen != null)
+        {
+            gameOverScreen.SetActive(true);
+            if (finalScoreText != null) finalScoreText.text = "Final Score: " + finalScore;
+            if (goldEarnedText != null) goldEarnedText.text = "Gold Earned: " + goldEarned;
+        }
+    }
+
+    public void RestartGame()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     IEnumerator GameLoop()
     {
-        // This is the main game loop that runs indefinitely.
-        while (true)
+        while (!isGameOver)
         {
-            // --- Step 1: Execute a random enemy spawn pattern ---
             int patternCount = enemySpawner.spawnPatterns.Count;
-            if (patternCount == 0)
+            if (patternCount > 0)
             {
-                Debug.LogWarning("No spawn patterns defined in the EnemySpawner. Game loop will pause.");
-                yield return new WaitUntil(() => enemySpawner.spawnPatterns.Count > 0); // Wait until patterns are added
+                int randomPatternIndex = Random.Range(0, patternCount);
+                enemySpawner.ExecutePattern(randomPatternIndex);
             }
 
-            int randomPatternIndex = Random.Range(0, patternCount);
-            enemySpawner.ExecutePattern(randomPatternIndex);
-
-            // --- Step 2: Wait for the pattern to be cleared ---
-            // We wait until the pattern is fully spawned AND all enemies are defeated.
-            // A simple way is to just wait for enemy count to be zero after a brief delay.
-            yield return new WaitForSeconds(1f); // Small initial delay
+            yield return new WaitForSeconds(1f);
             yield return new WaitUntil(() => Enemy.enemyCount == 0);
-            Debug.Log("Pattern cleared!");
 
-            // --- Step 3: Spawn a reward portal ---
+            if (isGameOver) yield break;
+
+            Debug.Log("Pattern cleared!");
             SpawnPortal();
 
-            // --- Step 4: Wait before starting the next pattern ---
             yield return new WaitForSeconds(timeBetweenPatterns);
         }
     }
@@ -81,13 +146,8 @@ public class GameManager : MonoBehaviour
             Debug.LogWarning("Portal prefabs or spawn point not set up in GameManager. Skipping portal spawn.");
             return;
         }
-
-        // Pick a random portal from the list
         int randomPortalIndex = Random.Range(0, portalPrefabs.Count);
         GameObject portalPrefab = portalPrefabs[randomPortalIndex];
-
-        // Spawn the chosen portal
         Instantiate(portalPrefab, portalSpawnPoint.position, portalSpawnPoint.rotation);
-        Debug.Log("Spawning portal: " + portalPrefab.name);
     }
 }
