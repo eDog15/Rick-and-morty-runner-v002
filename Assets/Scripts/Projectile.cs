@@ -16,7 +16,7 @@ public class Projectile : MonoBehaviour
         Rigidbody rb = GetComponent<Rigidbody>();
         if (rb != null)
         {
-            rb.velocity = transform.forward * speed;
+            rb.linearVelocity = transform.forward * speed;
         }
 
         // Destroy the projectile after its lifetime expires
